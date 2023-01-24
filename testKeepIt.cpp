@@ -56,7 +56,7 @@ int main()
 	if (inp.is_open())
 	{
 		std::getline(inp, inputStr);
-		std::cout << inputStr;
+		std::cout << inputStr << std::endl;
 		std::cout << "Number of unique word in input string: " << countUnique(inputStr);
 	}
 	inp.close();
