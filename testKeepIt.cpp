@@ -2,64 +2,49 @@
 #include <string>
 #include <vector>
 #include <fstream>
+#include <ctime>
+#include <unordered_set>
 
 
-//Function that check if str already contains in lib
-bool isUnique(const std::string& str, std::vector<std::string> lib, int count) {
-	for (int i = 0; i < count; i++)
-	{
-		if (lib[i] == str) {
-			return false;
-		}
-	}
-	return true;
-}
-
-long countUnique(std::string inputStr) {
-	std::string bufferStr{ "" };
-	//Main answer counter
-	long uniqueWordCounter{ 0 };
-	//Length of current bufferStr
-	long wordLen{ 0 };
-	//Library of uniques words in input string
-	std::vector<std::string> strLib;
-
-	for (auto ch = inputStr.begin(); ch != inputStr.end(); ++ch) {
-		//Checking if meet a separator 
-		if (((*ch == ' ') && (wordLen)) ||
-			((*ch != ' ') && ((ch + 1) == inputStr.end()))) {
-
-			if (isUnique(bufferStr, strLib, uniqueWordCounter)) {
-				//Resizing library and adding new word in it
-				strLib.resize(uniqueWordCounter + 1);
-				strLib[uniqueWordCounter] = bufferStr;
-				++uniqueWordCounter;
-				std::cout << "Current number of Uniq: " << uniqueWordCounter << std::endl;
+size_t countUnique(std::string fromFile) {
+	std::ifstream input(fromFile);
+	std::unordered_set<std::string> stringSet;
+	if (input.is_open()) {
+		std::string bufferStr{ "" };
+		//Length of current bufferStr
+		bool isWord{ false };
+		//Library of uniques words in input string
+		char ch;
+		while (input.get(ch))
+		{
+			//Checking if meet a separator 
+			if ((ch == ' ') && (isWord))  {
+				stringSet.insert(bufferStr);
+				bufferStr = "";
+				isWord = false;
 			}
-			//Clean buffer
-			bufferStr = "";
-			wordLen = 0;
+			else if (ch != ' ') {
+				bufferStr += ch;
+				isWord = true;
+			}
 		}
-		else if (*ch != ' ') {
-			//Collecting symbols into one word and count it length
-			bufferStr += *ch;
-			++wordLen;
-		}
+		//Collecting last word
+		if (input.eof())
+			stringSet.insert(bufferStr);
 	}
-	return uniqueWordCounter;
+	return stringSet.size();
 }
 
 int main()
 {
-	std::string inputStr;
-	std::ifstream inp("input1.txt");
-	if (inp.is_open())
-	{
-		std::getline(inp, inputStr);
-		std::cout << inputStr << std::endl;
-		std::cout << "Number of unique word in input string: " << countUnique(inputStr);
-	}
-	inp.close();
+	time_t sTime{ 0 };
+	sTime = time(NULL);
 
+	std::string inputFile{"large_input.txt"};
+	std:: cout << "Total unique words: " << countUnique(inputFile) << '\n';
+
+	time_t eTime{ 0 };
+	eTime = time(NULL);
+	std::cout << "Total completeon time: " << eTime - sTime << '\n';
 	return 0;
 }
