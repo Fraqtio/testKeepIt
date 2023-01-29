@@ -7,10 +7,10 @@
 #include <thread>
 #include <future>
 
-
+//Number of cores in processor
 const int processor_count = std::thread::hardware_concurrency();
 
-
+//Function that calculates file's size
 int fileSize(std::string filename) {
 	std::ifstream in_file(filename, std::ios::binary);
 	in_file.seekg(0, std::ios::end);
@@ -18,13 +18,15 @@ int fileSize(std::string filename) {
 	return file_size;
 }
 
-
+//Structure to catch and contain pieces of words from parallelized chunk
 struct connector {
 	std::string firstWord;
 	std::string lastWord;
 };
 
-
+//Function for single thread. 
+//Fill connector container by piece of first word and piece of last word in a range of char symbols from file.
+//All of words between first and last inserting in thread unordered set
 void readChunk(	int startInd, 
 				int endInd,
 				int core,
@@ -75,8 +77,9 @@ void readChunk(	int startInd,
 	return;
 }
 
-
-void connectPieces(std::vector<connector>& pieces, std::unordered_set<std::string>& stringSet) {
+//Function that check if pieces of words from different thread is one word and inserting that words to resulting unordered set
+void connectPieces(	std::vector<connector>& pieces, 
+					std::unordered_set<std::string>& stringSet) {
 	if (pieces.size() == 1) {
 		stringSet.insert(pieces[0].firstWord);
 		if (pieces[0].lastWord != " ")
@@ -110,30 +113,41 @@ void connectPieces(std::vector<connector>& pieces, std::unordered_set<std::strin
 	}
 }
 
-
-void setInsert(std::unordered_set<std::string>& set1, std::unordered_set<std::string>& set2, int& endFlag) {
+//Single thread unordered sets merge
+void setInsert(	std::unordered_set<std::string>& set1, 
+				std::unordered_set<std::string>& set2, int& endFlag) {
 	set1.insert(set2.begin(), set2.end());
 	++endFlag;
 }
 
-
-void concatSets(std::vector<std::unordered_set<std::string>>& sets, std::unordered_set<std::string>& set) {
+//Function that merging all of sets from vector to resulting set with binary steps
+void concatSets(std::vector<std::unordered_set<std::string>>& sets, 
+				std::unordered_set<std::string>& mainSet) {
 	int length = sets.size();
 	while (length > 1) {
 		int endFlag{ 0 };
 		if (length % 2 == 1)
-			std::thread(setInsert, std::ref(set), std::ref(sets[length-1]), std::ref(endFlag)).detach();
+			std::thread(setInsert, 
+						std::ref(mainSet), 
+						std::ref(sets[length-1]), 
+						std::ref(endFlag)).detach();
 		int halflen = length / 2;
 		for (int i = 0; i < halflen; i++)
-			std::thread(setInsert, std::ref(sets[i]), std::ref(sets[i+halflen]), std::ref(endFlag)).detach();
-		while (endFlag < (halflen + (length % 2))) { std::this_thread::sleep_for(std::chrono::milliseconds(100)); }
+			std::thread(setInsert, 
+						std::ref(sets[i]), 
+						std::ref(sets[i+halflen]), 
+						std::ref(endFlag)).detach();
+		while (endFlag < (halflen + (length % 2))) { 
+			std::this_thread::sleep_for(std::chrono::milliseconds(100)); 
+		}
 		length /= 2;
-		sets.resize(length);
+		sets.resize(length);																	//Clear some memory
 	}
-	set.insert(sets[0].begin(), sets[0].end());
+	mainSet.insert(sets[0].begin(), sets[0].end());
 }
 
-
+//Function that creating parallel tasks to read chunks of chars from given file and returns number of unique words in it
+//In the case of file size < 1e7 it used only one core, because it gives better perfomance
 int countChunkUnique(std::string fromFile) {
 	std::ifstream input(fromFile);
 	std::vector<connector> wordsParts;
@@ -142,20 +156,19 @@ int countChunkUnique(std::string fromFile) {
 	if (input.is_open()) {
 		int endFlag{ 0 };
 		int fileEnd{ fileSize(fromFile)};
-		if (fileEnd < 1e8) {
-			std::cout << "Joining thread 1" << '\n';
+		if (fileEnd < 1e7) {
+			std::cout << "Joining thread 0" << '\n';
 			stringSets.resize(1);
 			wordsParts.resize(1);
-			readChunk(0, fileEnd, 0, wordsParts, fromFile, stringSets[0], endFlag);
+			readChunk(0, fileEnd, 0, wordsParts, fromFile, stringSets[0], endFlag);				//First zero here is file start and second is 0 core
 		}
 		else {
 			wordsParts.resize(processor_count);
 			stringSets.resize(processor_count);
 			int chunkSize {fileEnd/processor_count};
 			for (int i = 0; i < processor_count; i++)	{
-				std::this_thread::sleep_for(std::chrono::milliseconds(10));
 				int startPoint{i * chunkSize};
-				int endPoint{(i == processor_count - 1) ? fileEnd : (i + 1) * chunkSize};
+				int endPoint{(i == processor_count - 1) ? fileEnd : (i + 1) * chunkSize};		//In the last chunk alg need to go to file end
 				std::cout << "Joining thread " << i << '\n';
 				std::thread(readChunk, 
 							startPoint, 
@@ -166,7 +179,9 @@ int countChunkUnique(std::string fromFile) {
 							std::ref(stringSets[i]),
 							std::ref(endFlag)).detach();	
 			}
-			while (endFlag != processor_count) { std::this_thread::sleep_for(std::chrono::milliseconds(100));}
+			while (endFlag != processor_count) { 
+				std::this_thread::sleep_for(std::chrono::milliseconds(100));					//Waiting for all thread to complete
+			}	
 		}
 		concatSets(stringSets, stringSet);
 		connectPieces(wordsParts, stringSet);
@@ -180,9 +195,8 @@ int main()
 {
 	time_t sTime{ 0 };
 	sTime = time(NULL);
-
 	
-	std::string inputFile{"large_input.txt"};
+	std::string inputFile{"input4.txt"};
 	std::cout << "Total unique words: " << countChunkUnique(inputFile) << '\n';
 
 	time_t eTime{ 0 };
